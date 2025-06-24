@@ -432,15 +432,25 @@
             color: #3b82f6;
             font-size: 0.75rem;
             cursor: pointer;
-            padding: 2px 0;
+            padding: 4px 8px;
             text-decoration: underline;
-            margin-top: 4px;
+            margin: 4px auto;
             display: block;
-            text-align: right;
+            text-align: center;
         }
 
         .show-more-btn:hover {
             color: #1d4ed8;
+        }
+
+        .clickable-connection {
+            cursor: pointer;
+            transition: color 0.15s ease;
+        }
+
+        .clickable-connection:hover {
+            color: #3b82f6 !important;
+            text-decoration: underline;
         }
 
         .connection-badge {
@@ -1343,7 +1353,10 @@
             );
         }
 
-        function showNodeDetails(node) {
+        // Track which nodes have expanded connections
+        let expandedConnections = new Set();
+
+        function showNodeDetails(node, showAllConnections = false) {
             // Clear previous selection
             nodeGroup.selectAll(".node").classed("selected", false);
             nodeGroup.selectAll(".node-label").classed("highlighted", false);
@@ -1467,27 +1480,40 @@
             }
 
             if (connectedNodes.length > 0) {
+                const isExpanded = showAllConnections || expandedConnections.has(node.id);
+                const connectionsToShow = isExpanded ? connectedNodes : connectedNodes.slice(0, 5);
+                
                 contentHTML += `
                     <div class="detail-section">
                         <div class="detail-section-title">Connected Entities</div>
                 `;
 
-                connectedNodes.slice(0, 5).forEach(link => {
+                connectionsToShow.forEach(link => {
                     const connectedNode = link.source.id === node.id ? link.target : link.source;
                     const relationshipType = link.type;
                     
                     contentHTML += `
                         <div class="detail-property">
                             <span class="detail-property-key">${relationshipType}</span>
-                            <span class="detail-property-value">${connectedNode.label || connectedNode.id}</span>
+                            <span class="detail-property-value clickable-connection" onclick="jumpToNode('${connectedNode.id}')">${connectedNode.label || connectedNode.id}</span>
                         </div>
                     `;
                 });
 
-                if (connectedNodes.length > 5) {
+                if (connectedNodes.length > 5 && !isExpanded) {
                     contentHTML += `
-                        <div style="text-align: center; color: #6b7280; font-size: 0.75rem; margin-top: 8px;">
-                            +${connectedNodes.length - 5} more connections
+                        <div style="text-align: center; margin-top: 8px;">
+                            <button class="show-more-btn" onclick="showAllConnections('${node.id}')">
+                                +${connectedNodes.length - 5} more connections
+                            </button>
+                        </div>
+                    `;
+                } else if (connectedNodes.length > 5 && isExpanded) {
+                    contentHTML += `
+                        <div style="text-align: center; margin-top: 8px;">
+                            <button class="show-more-btn" onclick="showLessConnections('${node.id}')">
+                                Show less
+                            </button>
                         </div>
                     `;
                 }
@@ -1584,6 +1610,86 @@
                 element.classList.add('truncated');
                 button.textContent = 'Show more';
             }
+        }
+
+        function showAllConnections(nodeId) {
+            expandedConnections.add(nodeId);
+            const node = allNodes.find(n => n.id === nodeId);
+            if (node) {
+                showNodeDetails(node, true);
+            }
+        }
+
+        function showLessConnections(nodeId) {
+            expandedConnections.delete(nodeId);
+            const node = allNodes.find(n => n.id === nodeId);
+            if (node) {
+                showNodeDetails(node, false);
+            }
+        }
+
+        function jumpToNode(nodeId) {
+            // Find the node in current visible nodes
+            const targetNode = nodes.find(n => n.id === nodeId);
+            
+            if (!targetNode) {
+                // If node is not visible (e.g., it's a product that's not expanded), try to find and expand its parent
+                const fullNode = allNodes.find(n => n.id === nodeId);
+                if (fullNode && fullNode.type === 'Product') {
+                    // Find the parent Orglevel3 that contains this product
+                    const parentLink = allLinks.find(link => {
+                        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                        
+                        if (targetId === nodeId) {
+                            const sourceNode = allNodes.find(n => n.id === sourceId);
+                            return sourceNode && sourceNode.type === 'Orglevel3';
+                        }
+                        if (sourceId === nodeId) {
+                            const targetNode = allNodes.find(n => n.id === targetId);
+                            return targetNode && targetNode.type === 'Orglevel3';
+                        }
+                        return false;
+                    });
+                    
+                    if (parentLink) {
+                        const parentId = typeof parentLink.source === 'object' ? parentLink.source.id : parentLink.source;
+                        const actualParentId = parentId === nodeId ? 
+                            (typeof parentLink.target === 'object' ? parentLink.target.id : parentLink.target) : parentId;
+                        
+                        // Expand the parent if not already expanded
+                        if (!expandedNodes.has(actualParentId)) {
+                            expandedNodes.add(actualParentId);
+                            filterVisibleNodes();
+                            updateVisualization();
+                            updateStats();
+                            
+                            // Wait for update to complete, then jump
+                            setTimeout(() => {
+                                jumpToNode(nodeId);
+                            }, 100);
+                            return;
+                        }
+                    }
+                }
+                
+                console.log(`Node ${nodeId} not found in visible nodes`);
+                return;
+            }
+            
+            // Show details for the target node
+            showNodeDetails(targetNode);
+            
+            // Center the view on the target node with smooth animation
+            const transform = d3.zoomIdentity
+                .translate(width / 2, height / 2)
+                .scale(1.5)
+                .translate(-targetNode.x, -targetNode.y);
+            
+            svg.transition().duration(500).call(
+                window.zoomBehavior.transform,
+                transform
+            );
         }
 
         function exportSVG() {
