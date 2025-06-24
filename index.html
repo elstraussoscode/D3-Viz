@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equinor | Graph Analytics Platform</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #fafafa;
+            min-height: 100vh;
+            color: #111827;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-bottom: 1px solid #e5e7eb;
+            padding: 32px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #d1d5db 50%, transparent);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .company-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #111827 0%, #374151 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.25rem;
+            letter-spacing: -0.05em;
+        }
+
+        .header-text {
+            text-align: left;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: -0.025em;
+        }
+
+        .header p {
+            margin: 4px 0 0 0;
+            color: #6b7280;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #166534;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .controls {
+            background: linear-gradient(135deg, #ffffff 0%, #fcfcfd 100%);
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: 
+                0 1px 3px 0 rgba(0, 0, 0, 0.1), 
+                0 1px 2px 0 rgba(0, 0, 0, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            display: flex;
+            gap: 32px;
+            align-items: end;
+            flex-wrap: wrap;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8) 50%, transparent);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 160px;
+            position: relative;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #111827;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-value {
+            font-size: 0.875rem;
+            color: #6b7280;
+            font-weight: 500;
+            margin-left: auto;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .control-group input[type="range"] {
+            height: 4px;
+            background: #e4e4e7;
+            border-radius: 2px;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #0a0a0a;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #0a0a0a;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .control-group select {
+            padding: 8px 12px;
+            border: 1px solid #e4e4e7;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #0a0a0a;
+            font-size: 0.875rem;
+            transition: border-color 0.2s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 8px center;
+            background-repeat: no-repeat;
+            background-size: 16px;
+            padding-right: 36px;
+        }
+
+        .control-group select:focus {
+            outline: none;
+            border-color: #0a0a0a;
+            box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: fit-content;
+            box-shadow: 
+                0 1px 3px 0 rgba(0, 0, 0, 0.1),
+                0 1px 2px 0 rgba(0, 0, 0, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            transform: translateY(-2px);
+            box-shadow: 
+                0 10px 25px rgba(0, 0, 0, 0.15),
+                0 4px 12px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+            transition: all 0.1s;
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            color: #111827;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-secondary:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .visualization-container {
+            background: linear-gradient(135deg, #ffffff 0%, #fcfcfd 100%);
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            gap: 24px;
+        }
+
+        .visualization-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8) 50%, transparent);
+        }
+
+        .graph-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .detail-panel {
+            width: 320px;
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.8) 0%, 
+                rgba(255, 255, 255, 0.4) 100%);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            transform: translateX(20px);
+            pointer-events: none;
+        }
+
+        .detail-panel.active {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: all;
+        }
+
+        .detail-header {
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .detail-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #111827;
+            margin: 0 0 4px 0;
+            letter-spacing: -0.025em;
+        }
+
+        .detail-type {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .detail-content {
+            space-y: 16px;
+        }
+
+        .detail-section {
+            margin-bottom: 20px;
+        }
+
+        .detail-section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #111827;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .detail-property {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .detail-property:last-child {
+            border-bottom: none;
+        }
+
+        .detail-property-key {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #6b7280;
+            text-transform: capitalize;
+        }
+
+        .detail-property-value {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #111827;
+            text-align: right;
+            max-width: 60%;
+            word-break: break-word;
+        }
+
+        .connection-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        #graph {
+            width: 100%;
+            height: 600px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.1) 0%, 
+                rgba(255, 255, 255, 0.05) 50%, 
+                rgba(0, 0, 0, 0.02) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #graph::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 0, 0, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            animation: gentle-float 8s ease-in-out infinite;
+        }
+
+        @keyframes gentle-float {
+            0%, 100% { 
+                background: 
+                    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 80%, rgba(0, 0, 0, 0.05) 0%, transparent 50%);
+            }
+            50% { 
+                background: 
+                    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.15) 0%, transparent 60%),
+                    radial-gradient(circle at 70% 70%, rgba(0, 0, 0, 0.03) 0%, transparent 60%);
+            }
+        }
+
+        .node {
+            cursor: pointer;
+            stroke: rgba(255, 255, 255, 0.8);
+            stroke-width: 2px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+        }
+
+        .node:hover {
+            stroke: rgba(255, 255, 255, 1);
+            stroke-width: 4px;
+            filter: 
+                drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2))
+                brightness(1.05);
+        }
+
+        .node.selected {
+            stroke: rgba(59, 130, 246, 0.8);
+            stroke-width: 4px;
+            filter: 
+                drop-shadow(0 0 20px rgba(59, 130, 246, 0.3))
+                drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { 
+                filter: 
+                    drop-shadow(0 0 20px rgba(59, 130, 246, 0.3))
+                    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1)); 
+            }
+            50% { 
+                filter: 
+                    drop-shadow(0 0 30px rgba(59, 130, 246, 0.5))
+                    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1)); 
+            }
+        }
+
+        .link {
+            stroke: rgba(161, 161, 170, 0.3);
+            stroke-opacity: 1;
+            stroke-width: 1px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.05));
+        }
+
+        .link:hover {
+            stroke: rgba(161, 161, 170, 0.8);
+            stroke-width: 3px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .link.connected {
+            stroke: rgba(59, 130, 246, 0.6);
+            stroke-width: 2px;
+            filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.3));
+        }
+
+        .node-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            fill: #374151;
+            text-anchor: middle;
+            pointer-events: none;
+            opacity: 0.8;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8));
+        }
+
+        .node-label.highlighted {
+            opacity: 1;
+            font-weight: 600;
+            fill: #111827;
+            filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 1));
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 12px;
+            background: #0a0a0a;
+            color: #ffffff;
+            border-radius: 6px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            font-size: 0.875rem;
+            max-width: 240px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            border: 1px solid #18181b;
+        }
+
+        .legend {
+            position: absolute;
+            top: 32px;
+            right: 32px;
+            background: linear-gradient(135deg, #ffffff 0%, #fcfcfd 100%);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            min-width: 180px;
+            z-index: 999;
+            max-height: 320px;
+            overflow-y: auto;
+            backdrop-filter: blur(8px);
+        }
+
+        .legend h4 {
+            margin: 0 0 16px 0;
+            color: #111827;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: flex-start;
+            margin: 12px 0;
+            font-size: 0.75rem;
+            color: #6b7280;
+            gap: 12px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 1px solid #e4e4e7;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #e4e4e7;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #0a0a0a;
+            margin: 0;
+            letter-spacing: -0.025em;
+        }
+
+        .stat-label {
+            color: #71717a;
+            font-weight: 500;
+            margin: 4px 0 0 0;
+            font-size: 0.875rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #71717a;
+            font-size: 0.875rem;
+        }
+
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border: 1px solid #fecaca;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 16px;
+            }
+            
+            .control-group {
+                min-width: auto;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            #graph {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="company-logo">E</div>
+                <div class="header-text">
+                    <h1>Graph Analytics Platform</h1>
+                    <p>Enterprise data visualization and network analysis</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    Live Data Connected
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="nodeSize">
+                    Node Size
+                    <span class="control-value" id="nodeSizeValue">8</span>
+                </label>
+                <input type="range" id="nodeSize" min="3" max="20" value="8">
+            </div>
+            <div class="control-group">
+                <label for="linkDistance">
+                    Link Distance
+                    <span class="control-value" id="linkDistanceValue">80</span>
+                </label>
+                <input type="range" id="linkDistance" min="30" max="200" value="80">
+            </div>
+            <div class="control-group">
+                <label for="charge">
+                    Force Strength
+                    <span class="control-value" id="chargeValue">200</span>
+                </label>
+                <input type="range" id="charge" min="-500" max="-50" value="-200">
+            </div>
+            <div class="control-group">
+                <label for="colorScheme">Visualization Mode</label>
+                <select id="colorScheme">
+                    <option value="category">Organizational Hierarchy</option>
+                    <option value="degree">Connection Density</option>
+                    <option value="cluster">Network Clusters</option>
+                </select>
+            </div>
+            <button class="btn" onclick="resetSimulation()">Reset Layout</button>
+            <button class="btn btn-secondary" onclick="resetZoom()">Reset View</button>
+            <button class="btn btn-secondary" onclick="zoomIn()">Zoom In</button>
+            <button class="btn btn-secondary" onclick="zoomOut()">Zoom Out</button>
+            <button class="btn" onclick="exportSVG()">Export Visualization</button>
+        </div>
+
+        <div class="visualization-container">
+            <div class="graph-container">
+                <div id="loading" class="loading">
+                    <h3>Loading your graph data...</h3>
+                    <p>Connecting to Neo4j and preparing visualization</p>
+                </div>
+                <svg id="graph"></svg>
+                <div class="tooltip" id="tooltip"></div>
+                <div class="legend" id="legend"></div>
+            </div>
+            <div class="detail-panel" id="detailPanel">
+                <div class="detail-header">
+                    <div class="detail-title" id="detailTitle">Select a Node</div>
+                    <div class="detail-type" id="detailType">Click on any entity to view details</div>
+                </div>
+                <div class="detail-content" id="detailContent">
+                    <div class="detail-section">
+                        <div class="detail-section-title">Network Analysis</div>
+                        <div style="text-align: center; color: #9ca3af; font-size: 0.875rem; padding: 20px;">
+                            Interactive organizational structure analysis
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <!-- Stats will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let simulation, svg, width, height, nodes, links, tooltip, legend;
+        let nodeGroup, linkGroup;
+
+        // Color schemes
+        const colorSchemes = {
+            category: d3.scaleOrdinal(d3.schemeSet3),
+            degree: d3.scaleSequential(d3.interpolateViridis),
+            cluster: d3.scaleOrdinal(d3.schemeTableau10)
+        };
+
+        // Initialize visualization
+        function initVisualization() {
+            const container = d3.select("#graph");
+            const containerNode = container.node();
+            const rect = containerNode.getBoundingClientRect();
+            
+            width = rect.width;
+            height = rect.height;
+
+            svg = container
+                .attr("width", width)
+                .attr("height", height);
+
+            // Add zoom and pan functionality
+            const zoomBehavior = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on("zoom", (event) => {
+                    const { transform } = event;
+                    graphGroup.attr("transform", transform);
+                });
+
+            svg.call(zoomBehavior);
+
+            // Create main group for zoom/pan
+            const graphGroup = svg.append("g").attr("class", "graph-group");
+
+            // Create groups for links and nodes inside the zoomable group
+            linkGroup = graphGroup.append("g").attr("class", "links");
+            nodeGroup = graphGroup.append("g").attr("class", "nodes");
+
+            // Store graphGroup globally for zoom functions
+            window.graphGroup = graphGroup;
+            window.zoomBehavior = zoomBehavior;
+
+            tooltip = d3.select("#tooltip");
+            legend = d3.select("#legend");
+
+            // Initialize simulation
+            simulation = d3.forceSimulation()
+                .force("link", d3.forceLink().id(d => d.id).distance(80))
+                .force("charge", d3.forceManyBody().strength(-200))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide().radius(15));
+        }
+
+        // Load and process data
+        async function loadData() {
+            try {
+                // First try to load from data.json (exported Neo4j data)
+                const response = await fetch('./data/graph-data.json');
+                if (!response.ok) {
+                    throw new Error('Data file not found');
+                }
+                const data = await response.json();
+                processData(data);
+            } catch (error) {
+                console.log('Loading sample data instead...');
+                loadSampleData();
+            }
+        }
+
+        // Load sample data for demonstration
+        function loadSampleData() {
+            const sampleData = {
+                nodes: [
+                    {id: "Customer_1", label: "Alice Johnson", type: "Customer", properties: {age: 28, city: "New York"}},
+                    {id: "Customer_2", label: "Bob Smith", type: "Customer", properties: {age: 34, city: "Los Angeles"}},
+                    {id: "Customer_3", label: "Carol Davis", type: "Customer", properties: {age: 29, city: "Chicago"}},
+                    {id: "Product_1", label: "Laptop Pro", type: "Product", properties: {price: 1299, category: "Electronics"}},
+                    {id: "Product_2", label: "Coffee Maker", type: "Product", properties: {price: 89, category: "Appliances"}},
+                    {id: "Product_3", label: "Running Shoes", type: "Product", properties: {price: 129, category: "Sports"}},
+                    {id: "Order_1", label: "Order #1001", type: "Order", properties: {date: "2024-01-15", total: 1299}},
+                    {id: "Order_2", label: "Order #1002", type: "Order", properties: {date: "2024-01-16", total: 89}},
+                    {id: "Order_3", label: "Order #1003", type: "Order", properties: {date: "2024-01-17", total: 258}},
+                    {id: "Category_1", label: "Electronics", type: "Category", properties: {}},
+                    {id: "Category_2", label: "Appliances", type: "Category", properties: {}},
+                    {id: "Category_3", label: "Sports", type: "Category", properties: {}}
+                ],
+                links: [
+                    {source: "Customer_1", target: "Order_1", type: "PLACED", properties: {}},
+                    {source: "Customer_2", target: "Order_2", type: "PLACED", properties: {}},
+                    {source: "Customer_3", target: "Order_3", type: "PLACED", properties: {}},
+                    {source: "Order_1", target: "Product_1", type: "CONTAINS", properties: {quantity: 1}},
+                    {source: "Order_2", target: "Product_2", type: "CONTAINS", properties: {quantity: 1}},
+                    {source: "Order_3", target: "Product_1", type: "CONTAINS", properties: {quantity: 1}},
+                    {source: "Order_3", target: "Product_3", type: "CONTAINS", properties: {quantity: 1}},
+                    {source: "Product_1", target: "Category_1", type: "BELONGS_TO", properties: {}},
+                    {source: "Product_2", target: "Category_2", type: "BELONGS_TO", properties: {}},
+                    {source: "Product_3", target: "Category_3", type: "BELONGS_TO", properties: {}},
+                    {source: "Customer_1", target: "Customer_3", type: "KNOWS", properties: {since: "2020"}},
+                    {source: "Customer_2", target: "Customer_3", type: "KNOWS", properties: {since: "2019"}}
+                ]
+            };
+            processData(sampleData);
+        }
+
+        // Process and visualize data
+        function processData(data) {
+            nodes = data.nodes;
+            links = data.links;
+
+            // Calculate node degrees
+            const nodeMap = new Map();
+            nodes.forEach(node => {
+                node.degree = 0;
+                nodeMap.set(node.id, node);
+            });
+
+            links.forEach(link => {
+                const source = typeof link.source === 'object' ? link.source.id : link.source;
+                const target = typeof link.target === 'object' ? link.target.id : link.target;
+                nodeMap.get(source).degree++;
+                nodeMap.get(target).degree++;
+            });
+
+            // Hide loading and show visualization
+            d3.select("#loading").style("display", "none");
+            d3.select("#graph").style("display", "block");
+
+            updateVisualization();
+            updateStats();
+            updateLegend();
+        }
+
+        // Update visualization
+        function updateVisualization() {
+            const nodeSize = +d3.select("#nodeSize").property("value");
+            const linkDistance = +d3.select("#linkDistance").property("value");
+            const charge = +d3.select("#charge").property("value");
+            const colorScheme = d3.select("#colorScheme").property("value");
+
+            // Update simulation forces
+            simulation
+                .force("link", d3.forceLink().id(d => d.id).distance(linkDistance))
+                .force("charge", d3.forceManyBody().strength(charge));
+
+            // Create links
+            const link = linkGroup.selectAll(".link")
+                .data(links, d => `${d.source.id || d.source}-${d.target.id || d.target}`);
+
+            link.exit().remove();
+
+            const linkEnter = link.enter().append("line")
+                .attr("class", "link");
+
+            linkEnter.merge(link)
+                .attr("stroke-width", d => Math.sqrt(d.properties?.quantity || 1));
+
+            // Create nodes
+            const node = nodeGroup.selectAll(".node")
+                .data(nodes, d => d.id);
+
+            node.exit().remove();
+
+            const nodeEnter = node.enter().append("circle")
+                .attr("class", "node")
+                .attr("r", d => nodeSize + (d.degree || 0))
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended))
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip)
+                .on("click", nodeClicked);
+
+            // Apply colors based on scheme
+            nodeEnter.merge(node)
+                .attr("fill", d => getNodeColor(d, colorScheme))
+                .attr("r", d => nodeSize + Math.sqrt(d.degree || 0));
+
+            // Add labels positioned below nodes
+            const labels = nodeGroup.selectAll(".node-label")
+                .data(nodes, d => d.id);
+
+            labels.exit().remove();
+
+            const labelsEnter = labels.enter().append("text")
+                .attr("class", "node-label")
+                .attr("text-anchor", "middle")
+                .attr("dy", "1.2em");
+
+            labelsEnter.merge(labels)
+                .text(d => {
+                    const text = d.label || d.id;
+                    return text.length > 20 ? text.substring(0, 17) + '...' : text;
+                })
+                .on("mouseover", function(event, d) {
+                    d3.select(this).classed("highlighted", true);
+                    showTooltip(event, d);
+                })
+                .on("mouseout", function(event, d) {
+                    if (!d3.select(nodeGroup.selectAll(".node").filter(n => n.id === d.id).node()).classed("selected")) {
+                        d3.select(this).classed("highlighted", false);
+                    }
+                    hideTooltip();
+                })
+                .on("click", function(event, d) {
+                    nodeClicked(event, d);
+                });
+
+            // Update simulation
+            simulation.nodes(nodes);
+            simulation.force("link").links(links);
+            simulation.alpha(1).restart();
+
+            // Update positions on tick
+            simulation.on("tick", () => {
+                linkGroup.selectAll(".link")
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                nodeGroup.selectAll(".node")
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+
+                nodeGroup.selectAll(".node-label")
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y + (nodeSize + Math.sqrt(d.degree || 0)) + 8);
+            });
+        }
+
+        // Get node color based on scheme
+        function getNodeColor(node, scheme) {
+            switch(scheme) {
+                case 'category':
+                    // Black and white gradient for different types
+                    switch(node.type) {
+                        case 'Company': return '#0a0a0a';        // Pure black
+                        case 'Orglevel1': return '#404040';      // Dark gray
+                        case 'Orglevel2': return '#737373';      // Medium gray
+                        case 'Orglevel3': return '#a3a3a3';      // Light gray
+                        default: return '#d4d4d4';              // Very light gray
+                    }
+                case 'degree':
+                    const maxDegree = d3.max(nodes, d => d.degree);
+                    const ratio = node.degree / maxDegree;
+                    // Gradient from light gray to black based on connections
+                    const grayValue = Math.floor(255 - (ratio * 235)); // 255 to 20
+                    return `rgb(${grayValue}, ${grayValue}, ${grayValue})`;
+                case 'cluster':
+                    return colorSchemes.cluster(node.cluster || node.type);
+                default:
+                    switch(node.type) {
+                        case 'Company': return '#0a0a0a';
+                        case 'Orglevel1': return '#404040';
+                        case 'Orglevel2': return '#737373';
+                        case 'Orglevel3': return '#a3a3a3';
+                        default: return '#d4d4d4';
+                    }
+            }
+        }
+
+        // Event handlers
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        function showTooltip(event, d) {
+            let content = `<strong>${d.label || d.id}</strong><br>`;
+            content += `Type: ${d.type}<br>`;
+            content += `Connections: ${d.degree}<br>`;
+            
+            if (d.properties && Object.keys(d.properties).length > 0) {
+                content += '<br><strong>Properties:</strong><br>';
+                Object.entries(d.properties).forEach(([key, value]) => {
+                    if (typeof value === 'object' && value !== null) {
+                        // Skip complex objects for cleaner display
+                        return;
+                    }
+                    const displayValue = String(value).length > 50 ? 
+                        String(value).substring(0, 50) + '...' : value;
+                    content += `${key}: ${displayValue}<br>`;
+                });
+            }
+
+            // Smart positioning to keep tooltip on screen
+            let left = event.pageX + 15;
+            let top = event.pageY - 10;
+            
+            // Adjust if tooltip would go off right edge
+            if (left + 220 > window.innerWidth) {
+                left = event.pageX - 220;
+            }
+            
+            // Adjust if tooltip would go off bottom edge
+            if (top + 200 > window.innerHeight) {
+                top = event.pageY - 200;
+            }
+            
+            // Ensure tooltip stays within bounds
+            left = Math.max(10, left);
+            top = Math.max(10, top);
+
+            tooltip.html(content)
+                .style("left", left + "px")
+                .style("top", top + "px")
+                .style("opacity", 1);
+        }
+
+        function hideTooltip() {
+            tooltip.style("opacity", 0);
+        }
+
+        function nodeClicked(event, d) {
+            // Show details in side panel
+            showNodeDetails(d);
+            
+            // Optional: Center the view on the clicked node
+            const transform = d3.zoomIdentity
+                .translate(width / 2, height / 2)
+                .scale(1.5)
+                .translate(-d.x, -d.y);
+            
+            svg.transition().duration(750).call(
+                window.zoomBehavior.transform,
+                transform
+            );
+        }
+
+        function showNodeDetails(node) {
+            // Clear previous selection
+            nodeGroup.selectAll(".node").classed("selected", false);
+            nodeGroup.selectAll(".node-label").classed("highlighted", false);
+            linkGroup.selectAll(".link").classed("connected", false);
+            
+            // Highlight selected node
+            nodeGroup.selectAll(".node")
+                .filter(d => d.id === node.id)
+                .classed("selected", true);
+                
+            // Highlight selected node label
+            nodeGroup.selectAll(".node-label")
+                .filter(d => d.id === node.id)
+                .classed("highlighted", true);
+            
+            // Highlight connected links
+            linkGroup.selectAll(".link")
+                .filter(d => d.source.id === node.id || d.target.id === node.id)
+                .classed("connected", true);
+
+            const detailPanel = d3.select("#detailPanel");
+            const detailTitle = d3.select("#detailTitle");
+            const detailType = d3.select("#detailType");
+            const detailContent = d3.select("#detailContent");
+
+            // Update title and type
+            detailTitle.text(node.label || node.id);
+            
+            const typeLabels = {
+                'Company': 'Corporate Entity',
+                'Orglevel1': 'Strategic Business Unit',
+                'Orglevel2': 'Operational Division',
+                'Orglevel3': 'Asset Management Unit'
+            };
+            
+            detailType.text(typeLabels[node.type] || node.type);
+
+            // Get connected nodes
+            const connectedNodes = links.filter(link => 
+                link.source.id === node.id || link.target.id === node.id
+            );
+
+            // Build content
+            let contentHTML = `
+                <div class="detail-section">
+                    <div class="detail-section-title">Network Metrics</div>
+                    <div class="detail-property">
+                        <span class="detail-property-key">Connections</span>
+                        <span class="detail-property-value connection-badge">${node.degree || 0}</span>
+                    </div>
+                    <div class="detail-property">
+                        <span class="detail-property-key">Entity ID</span>
+                        <span class="detail-property-value">${node.neo4jId || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
+
+            if (node.properties && Object.keys(node.properties).length > 0) {
+                contentHTML += `
+                    <div class="detail-section">
+                        <div class="detail-section-title">Properties</div>
+                `;
+
+                Object.entries(node.properties).forEach(([key, value]) => {
+                    if (typeof value === 'object' && value !== null) {
+                        return; // Skip complex objects
+                    }
+                    
+                    let displayValue = String(value);
+                    if (displayValue.length > 50) {
+                        displayValue = displayValue.substring(0, 50) + '...';
+                    }
+
+                    contentHTML += `
+                        <div class="detail-property">
+                            <span class="detail-property-key">${key}</span>
+                            <span class="detail-property-value">${displayValue}</span>
+                        </div>
+                    `;
+                });
+
+                contentHTML += '</div>';
+            }
+
+            if (connectedNodes.length > 0) {
+                contentHTML += `
+                    <div class="detail-section">
+                        <div class="detail-section-title">Connected Entities</div>
+                `;
+
+                connectedNodes.slice(0, 5).forEach(link => {
+                    const connectedNode = link.source.id === node.id ? link.target : link.source;
+                    const relationshipType = link.type;
+                    
+                    contentHTML += `
+                        <div class="detail-property">
+                            <span class="detail-property-key">${relationshipType}</span>
+                            <span class="detail-property-value">${connectedNode.label || connectedNode.id}</span>
+                        </div>
+                    `;
+                });
+
+                if (connectedNodes.length > 5) {
+                    contentHTML += `
+                        <div style="text-align: center; color: #6b7280; font-size: 0.75rem; margin-top: 8px;">
+                            +${connectedNodes.length - 5} more connections
+                        </div>
+                    `;
+                }
+
+                contentHTML += '</div>';
+            }
+
+            detailContent.html(contentHTML);
+            detailPanel.classed("active", true);
+        }
+
+        // Control functions
+        function resetSimulation() {
+            simulation.alpha(1).restart();
+        }
+
+        function resetZoom() {
+            svg.transition().duration(750).call(
+                window.zoomBehavior.transform,
+                d3.zoomIdentity
+            );
+        }
+
+        function zoomIn() {
+            svg.transition().duration(300).call(
+                window.zoomBehavior.scaleBy,
+                1.5
+            );
+        }
+
+        function zoomOut() {
+            svg.transition().duration(300).call(
+                window.zoomBehavior.scaleBy,
+                1 / 1.5
+            );
+        }
+
+        function exportSVG() {
+            const svgData = new XMLSerializer().serializeToString(svg.node());
+            const svgBlob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
+            const svgUrl = URL.createObjectURL(svgBlob);
+            const downloadLink = document.createElement("a");
+            downloadLink.href = svgUrl;
+            downloadLink.download = "graph-visualization.svg";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+
+        // Update statistics
+        function updateStats() {
+            const nodeTypes = {};
+            const linkTypes = {};
+
+            nodes.forEach(node => {
+                nodeTypes[node.type] = (nodeTypes[node.type] || 0) + 1;
+            });
+
+            links.forEach(link => {
+                linkTypes[link.type] = (linkTypes[link.type] || 0) + 1;
+            });
+
+            const statsHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${nodes.length}</div>
+                    <div class="stat-label">Total Nodes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${links.length}</div>
+                    <div class="stat-label">Total Relationships</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${Object.keys(nodeTypes).length}</div>
+                    <div class="stat-label">Node Types</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${Object.keys(linkTypes).length}</div>
+                    <div class="stat-label">Relationship Types</div>
+                </div>
+            `;
+
+            d3.select("#stats").html(statsHTML);
+        }
+
+        // Update legend
+        function updateLegend() {
+            const colorScheme = d3.select("#colorScheme").property("value");
+            const types = [...new Set(nodes.map(d => d.type))];
+            
+            const legendTitles = {
+                'category': 'Organizational Structure',
+                'degree': 'Connection Density',
+                'cluster': 'Network Clusters'
+            };
+            
+            const typeLabels = {
+                'Company': 'Corporate Entity',
+                'Orglevel1': 'Strategic Business Units',
+                'Orglevel2': 'Operational Divisions',
+                'Orglevel3': 'Asset Management Units'
+            };
+            
+            let legendHTML = `<h4>${legendTitles[colorScheme] || 'Node Classification'}</h4>`;
+            
+            types.forEach(type => {
+                const color = getNodeColor({type: type}, colorScheme);
+                const label = typeLabels[type] || type;
+                const count = nodes.filter(n => n.type === type).length;
+                
+                legendHTML += `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: ${color}"></div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 500; color: #111827; font-size: 0.75rem;">${label}</div>
+                            <div style="color: #6b7280; font-size: 0.7rem;">${count} entities</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            legend.html(legendHTML);
+        }
+
+        // Event listeners with value updates
+        d3.select("#nodeSize").on("input", function() {
+            d3.select("#nodeSizeValue").text(this.value);
+            updateVisualization();
+        });
+        
+        d3.select("#linkDistance").on("input", function() {
+            d3.select("#linkDistanceValue").text(this.value);
+            updateVisualization();
+        });
+        
+        d3.select("#charge").on("input", function() {
+            d3.select("#chargeValue").text(Math.abs(this.value));
+            updateVisualization();
+        });
+        
+        d3.select("#colorScheme").on("change", () => {
+            updateVisualization();
+            updateLegend();
+        });
+
+        // Initialize everything
+        document.addEventListener('DOMContentLoaded', function() {
+            initVisualization();
+            loadData();
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const container = d3.select("#graph");
+            const containerNode = container.node();
+            const rect = containerNode.getBoundingClientRect();
+            
+            width = rect.width;
+            height = rect.height;
+
+            svg.attr("width", width).attr("height", height);
+            simulation.force("center", d3.forceCenter(width / 2, height / 2));
+            simulation.alpha(0.3).restart();
+        });
+    </script>
+</body>
+</html> 
