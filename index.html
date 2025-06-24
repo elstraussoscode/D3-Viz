@@ -543,10 +543,11 @@
             font-weight: 500;
             fill: #374151;
             text-anchor: middle;
-            pointer-events: none;
+            pointer-events: all;
             opacity: 0.8;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8));
+            cursor: pointer;
         }
 
         .node-label.highlighted {
@@ -554,6 +555,29 @@
             font-weight: 600;
             fill: #111827;
             filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 1));
+        }
+
+        .node-label.truncated {
+            fill: #3b82f6;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+
+        .node-label.truncated:hover {
+            fill: #1d4ed8;
+            cursor: pointer;
+        }
+
+        .expand-text-btn {
+            font-size: 0.7rem;
+            fill: #3b82f6;
+            cursor: pointer;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        .expand-text-btn:hover {
+            fill: #1d4ed8;
         }
 
         .tooltip {
@@ -968,10 +992,34 @@
                 .attr("text-anchor", "middle")
                 .attr("dy", "1.2em");
 
+            // Handle text truncation with expand functionality
             labelsEnter.merge(labels)
-                .text(d => {
+                .each(function(d) {
+                    const element = d3.select(this);
                     const text = d.label || d.id;
-                    return text.length > 20 ? text.substring(0, 17) + '...' : text;
+                    const maxLength = 25;
+                    
+                    element.selectAll("*").remove(); // Clear existing content
+                    
+                    if (text.length <= maxLength) {
+                        // Short text - display as is
+                        element.text(text);
+                    } else {
+                        // Long text - create truncated version with expand option
+                        const truncated = text.substring(0, maxLength) + '...';
+                        element.text(truncated).classed("truncated", true);
+                        
+                        // Add "show more" functionality on click
+                        element.on("click", function(event, d) {
+                            event.stopPropagation();
+                            const current = element.text();
+                            if (current.includes('...')) {
+                                element.text(text).classed("truncated", false);
+                            } else {
+                                element.text(truncated).classed("truncated", true);
+                            }
+                        });
+                    }
                 })
                 .on("mouseover", function(event, d) {
                     d3.select(this).classed("highlighted", true);
@@ -982,15 +1030,12 @@
                         d3.select(this).classed("highlighted", false);
                     }
                     hideTooltip();
-                })
-                .on("click", function(event, d) {
-                    nodeClicked(event, d);
                 });
 
-            // Update simulation
+            // Update simulation with faster initial animation
             simulation.nodes(nodes);
             simulation.force("link").links(links);
-            simulation.alpha(1).restart();
+            simulation.alpha(1).alphaDecay(0.02).restart(); // Faster convergence
 
             // Update positions on tick
             simulation.on("tick", () => {
@@ -1017,10 +1062,11 @@
                     // Black and white gradient for different types
                     switch(node.type) {
                         case 'Company': return '#0a0a0a';        // Pure black
-                        case 'Orglevel1': return '#404040';      // Dark gray
-                        case 'Orglevel2': return '#737373';      // Medium gray
-                        case 'Orglevel3': return '#a3a3a3';      // Light gray
-                        default: return '#d4d4d4';              // Very light gray
+                        case 'Orglevel1': return '#374151';      // Dark gray
+                        case 'Orglevel2': return '#6b7280';      // Medium-dark gray
+                        case 'Orglevel3': return '#9ca3af';      // Medium gray
+                        case 'Product': return '#d1d5db';        // Light gray
+                        default: return '#e5e7eb';              // Very light gray
                     }
                 case 'degree':
                     const maxDegree = d3.max(nodes, d => d.degree);
@@ -1033,10 +1079,11 @@
                 default:
                     switch(node.type) {
                         case 'Company': return '#0a0a0a';
-                        case 'Orglevel1': return '#404040';
-                        case 'Orglevel2': return '#737373';
-                        case 'Orglevel3': return '#a3a3a3';
-                        default: return '#d4d4d4';
+                        case 'Orglevel1': return '#374151';
+                        case 'Orglevel2': return '#6b7280';
+                        case 'Orglevel3': return '#9ca3af';
+                        case 'Product': return '#d1d5db';
+                        default: return '#e5e7eb';
                     }
             }
         }
@@ -1327,7 +1374,8 @@
                 'Company': 'Corporate Entity',
                 'Orglevel1': 'Strategic Business Units',
                 'Orglevel2': 'Operational Divisions',
-                'Orglevel3': 'Asset Management Units'
+                'Orglevel3': 'Asset Management Units',
+                'Product': 'Product Portfolio'
             };
             
             let legendHTML = `<h4>${legendTitles[colorScheme] || 'Node Classification'}</h4>`;
