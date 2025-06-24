@@ -614,21 +614,7 @@
             fill: #1d4ed8;
         }
 
-        .tooltip {
-            position: absolute;
-            padding: 12px;
-            background: #0a0a0a;
-            color: #ffffff;
-            border-radius: 6px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.1s ease;
-            font-size: 0.875rem;
-            max-width: 240px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-            z-index: 1000;
-            border: 1px solid #18181b;
-        }
+
 
         .legend {
             position: absolute;
@@ -810,7 +796,6 @@
                     <p>Connecting to Neo4j and preparing visualization</p>
                 </div>
                 <svg id="graph"></svg>
-                <div class="tooltip" id="tooltip"></div>
                 <div class="legend" id="legend"></div>
             </div>
             <div class="detail-panel" id="detailPanel">
@@ -836,7 +821,7 @@
 
     <script>
         // Global variables
-        let simulation, svg, width, height, nodes, links, tooltip, legend;
+        let simulation, svg, width, height, nodes, links, legend;
         let nodeGroup, linkGroup;
         let allNodes, allLinks; // Store complete dataset
         let expandedNodes = new Set(); // Track which Orglevel3 nodes are expanded
@@ -883,7 +868,6 @@
             window.graphGroup = graphGroup;
             window.zoomBehavior = zoomBehavior;
 
-            tooltip = d3.select("#tooltip");
             legend = d3.select("#legend");
 
             // Initialize simulation
@@ -974,6 +958,11 @@
             updateVisualization();
             updateStats();
             updateLegend();
+            
+            // Reset layout after initial load for optimal positioning
+            setTimeout(() => {
+                resetSimulation();
+            }, 100);
         }
 
         // Check if an Orglevel3 node has associated products
@@ -1088,8 +1077,7 @@
                     .on("start", dragstarted)
                     .on("drag", dragged)
                     .on("end", dragended))
-                .on("mouseover", showTooltip)
-                .on("mouseout", hideTooltip)
+
                 .on("click", nodeClicked);
 
             // Apply colors based on scheme and update classes
@@ -1127,13 +1115,11 @@
                 })
                 .on("mouseover", function(event, d) {
                     d3.select(this).classed("highlighted", true);
-                    showTooltip(event, d);
                 })
                 .on("mouseout", function(event, d) {
                     if (!d3.select(nodeGroup.selectAll(".node").filter(n => n.id === d.id).node()).classed("selected")) {
                         d3.select(this).classed("highlighted", false);
                     }
-                    hideTooltip();
                 })
                 .on("click", function(event, d) {
                     nodeClicked(event, d);
@@ -1313,51 +1299,7 @@
             d.fy = null;
         }
 
-        function showTooltip(event, d) {
-            let content = `<strong>${d.label || d.id}</strong><br>`;
-            content += `Type: ${d.type}<br>`;
-            content += `Connections: ${d.degree}<br>`;
-            
-            if (d.properties && Object.keys(d.properties).length > 0) {
-                content += '<br><strong>Properties:</strong><br>';
-                Object.entries(d.properties).forEach(([key, value]) => {
-                    if (typeof value === 'object' && value !== null) {
-                        // Skip complex objects for cleaner display
-                        return;
-                    }
-                    const displayValue = String(value).length > 50 ? 
-                        String(value).substring(0, 50) + '...' : value;
-                    content += `${key}: ${displayValue}<br>`;
-                });
-            }
 
-            // Smart positioning to keep tooltip on screen
-            let left = event.pageX + 15;
-            let top = event.pageY - 10;
-            
-            // Adjust if tooltip would go off right edge
-            if (left + 220 > window.innerWidth) {
-                left = event.pageX - 220;
-            }
-            
-            // Adjust if tooltip would go off bottom edge
-            if (top + 200 > window.innerHeight) {
-                top = event.pageY - 200;
-            }
-            
-            // Ensure tooltip stays within bounds
-            left = Math.max(10, left);
-            top = Math.max(10, top);
-
-            tooltip.html(content)
-                .style("left", left + "px")
-                .style("top", top + "px")
-                .style("opacity", 1);
-        }
-
-        function hideTooltip() {
-            tooltip.style("opacity", 0);
-        }
 
         function nodeClicked(event, d) {
             // Handle Orglevel3 expansion/collapse
@@ -1560,24 +1502,30 @@
         // Control functions
         function resetSimulation() {
             // Reset without fly-in animation
-            simulation.alpha(1);
-            for (let i = 0; i < 300; ++i) simulation.tick();
-            simulation.alpha(0);
-            
-            // Update positions immediately
-            linkGroup.selectAll(".link")
-                .attr("x1", d => d.source.x)
-                .attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x)
-                .attr("y2", d => d.target.y);
+            if (nodes && nodes.length > 0) {
+                simulation.alpha(1);
+                for (let i = 0; i < 300; ++i) simulation.tick();
+                simulation.alpha(0);
+                
+                // Update positions immediately
+                linkGroup.selectAll(".link")
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
 
-            nodeGroup.selectAll(".node")
-                .attr("cx", d => d.x)
-                .attr("cy", d => d.y);
+                nodeGroup.selectAll(".node")
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
 
-            nodeGroup.selectAll(".node-label")
-                .attr("x", d => d.x)
-                .attr("y", d => d.y + (+d3.select("#nodeSize").property("value") + Math.sqrt(d.degree || 0)) + 8);
+                nodeGroup.selectAll(".node-label")
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y + (+d3.select("#nodeSize").property("value") + Math.sqrt(d.degree || 0)) + 8);
+                    
+                nodeGroup.selectAll(".expand-indicator")
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y + 3);
+            }
         }
 
         function resetZoom() {
@@ -1767,7 +1715,11 @@
 
             svg.attr("width", width).attr("height", height);
             simulation.force("center", d3.forceCenter(width / 2, height / 2));
-            simulation.alpha(0.3).restart();
+            
+            // Reset layout after resize for optimal positioning
+            setTimeout(() => {
+                resetSimulation();
+            }, 50);
         });
     </script>
 </body>
