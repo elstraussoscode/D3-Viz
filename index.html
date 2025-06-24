@@ -422,6 +422,27 @@
             word-break: break-word;
         }
 
+        .detail-property-value.truncated {
+            color: #6b7280;
+        }
+
+        .show-more-btn {
+            background: none;
+            border: none;
+            color: #3b82f6;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 2px 0;
+            text-decoration: underline;
+            margin-top: 4px;
+            display: block;
+            text-align: right;
+        }
+
+        .show-more-btn:hover {
+            color: #1d4ed8;
+        }
+
         .connection-badge {
             display: inline-flex;
             align-items: center;
@@ -484,7 +505,7 @@
             cursor: pointer;
             stroke: rgba(255, 255, 255, 0.8);
             stroke-width: 2px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
         }
 
@@ -522,7 +543,7 @@
             stroke: rgba(161, 161, 170, 0.3);
             stroke-opacity: 1;
             stroke-width: 1px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.05));
         }
 
@@ -545,7 +566,7 @@
             text-anchor: middle;
             pointer-events: all;
             opacity: 0.8;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.8));
             cursor: pointer;
         }
@@ -558,14 +579,27 @@
         }
 
         .node-label.truncated {
-            fill: #3b82f6;
-            text-decoration: underline;
-            text-decoration-style: dotted;
+            fill: #6b7280;
         }
 
-        .node-label.truncated:hover {
-            fill: #1d4ed8;
+        .node.expandable {
+            stroke: #3b82f6;
+            stroke-width: 2px;
             cursor: pointer;
+        }
+
+        .node.expanded {
+            stroke: #10b981;
+            stroke-width: 3px;
+        }
+
+        .expand-indicator {
+            font-size: 0.8rem;
+            font-weight: bold;
+            fill: #ffffff;
+            text-anchor: middle;
+            pointer-events: none;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         .expand-text-btn {
@@ -588,7 +622,7 @@
             border-radius: 6px;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.1s ease;
             font-size: 0.875rem;
             max-width: 240px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
@@ -756,15 +790,16 @@
             <div class="control-group">
                 <label for="colorScheme">Visualization Mode</label>
                 <select id="colorScheme">
+                    <option value="cluster">Network Clusters</option>
                     <option value="category">Organizational Hierarchy</option>
                     <option value="degree">Connection Density</option>
-                    <option value="cluster">Network Clusters</option>
                 </select>
             </div>
             <button class="btn" onclick="resetSimulation()">Reset Layout</button>
             <button class="btn btn-secondary" onclick="resetZoom()">Reset View</button>
             <button class="btn btn-secondary" onclick="zoomIn()">Zoom In</button>
             <button class="btn btn-secondary" onclick="zoomOut()">Zoom Out</button>
+            <button class="btn" onclick="toggleAllProducts()">Toggle All Products</button>
             <button class="btn" onclick="exportSVG()">Export Visualization</button>
         </div>
 
@@ -803,6 +838,9 @@
         // Global variables
         let simulation, svg, width, height, nodes, links, tooltip, legend;
         let nodeGroup, linkGroup;
+        let allNodes, allLinks; // Store complete dataset
+        let expandedNodes = new Set(); // Track which Orglevel3 nodes are expanded
+        let visibleNodes, visibleLinks; // Currently displayed subset
 
         // Color schemes
         const colorSchemes = {
@@ -909,22 +947,25 @@
 
         // Process and visualize data
         function processData(data) {
-            nodes = data.nodes;
-            links = data.links;
+            allNodes = data.nodes;
+            allLinks = data.links;
 
-            // Calculate node degrees
+            // Calculate node degrees for all nodes
             const nodeMap = new Map();
-            nodes.forEach(node => {
+            allNodes.forEach(node => {
                 node.degree = 0;
                 nodeMap.set(node.id, node);
             });
 
-            links.forEach(link => {
+            allLinks.forEach(link => {
                 const source = typeof link.source === 'object' ? link.source.id : link.source;
                 const target = typeof link.target === 'object' ? link.target.id : link.target;
-                nodeMap.get(source).degree++;
-                nodeMap.get(target).degree++;
+                if (nodeMap.get(source)) nodeMap.get(source).degree++;
+                if (nodeMap.get(target)) nodeMap.get(target).degree++;
             });
+
+            // Initially show only organizational hierarchy (hide products)
+            filterVisibleNodes();
 
             // Hide loading and show visualization
             d3.select("#loading").style("display", "none");
@@ -935,16 +976,85 @@
             updateLegend();
         }
 
+        // Check if an Orglevel3 node has associated products
+        function hasProducts(orglevel3Id) {
+            return allLinks.some(link => {
+                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                
+                // Check if this Orglevel3 is connected to any Product
+                if (sourceId === orglevel3Id) {
+                    const targetNode = allNodes.find(n => n.id === targetId);
+                    return targetNode && targetNode.type === 'Product';
+                }
+                if (targetId === orglevel3Id) {
+                    const sourceNode = allNodes.find(n => n.id === sourceId);
+                    return sourceNode && sourceNode.type === 'Product';
+                }
+                return false;
+            });
+        }
+
+        // Filter nodes and links based on expansion state
+        function filterVisibleNodes() {
+            // Always show Company, Orglevel1, Orglevel2, Orglevel3
+            visibleNodes = allNodes.filter(node => {
+                if (node.type !== 'Product') return true;
+                
+                // For products, only show if their parent Orglevel3 is expanded
+                const parentLinks = allLinks.filter(link => 
+                    (link.target === node.id || (typeof link.target === 'object' && link.target.id === node.id)) &&
+                    (link.source !== node.id && (typeof link.source !== 'object' || link.source.id !== node.id))
+                );
+                
+                return parentLinks.some(link => {
+                    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                    const sourceNode = allNodes.find(n => n.id === sourceId);
+                    return sourceNode && sourceNode.type === 'Orglevel3' && expandedNodes.has(sourceId);
+                });
+            });
+
+            // Only show links where both source and target are visible
+            const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
+            visibleLinks = allLinks.filter(link => {
+                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+            });
+
+            // Update the global nodes and links to the visible subset
+            nodes = visibleNodes;
+            links = visibleLinks;
+        }
+
         // Update visualization
         function updateVisualization() {
             const nodeSize = +d3.select("#nodeSize").property("value");
             const linkDistance = +d3.select("#linkDistance").property("value");
             const charge = +d3.select("#charge").property("value");
             const colorScheme = d3.select("#colorScheme").property("value");
+            
+            // Store current positions to prevent jumping
+            const currentPositions = new Map();
+            nodeGroup.selectAll(".node").each(d => {
+                if (d.x !== undefined && d.y !== undefined) {
+                    currentPositions.set(d.id, {x: d.x, y: d.y});
+                }
+            });
 
-            // Update simulation forces
+            // Update simulation forces with custom link distance for products
             simulation
-                .force("link", d3.forceLink().id(d => d.id).distance(linkDistance))
+                .force("link", d3.forceLink().id(d => d.id).distance(d => {
+                    // Keep products close to their parent Orglevel3
+                    const sourceNode = allNodes.find(n => n.id === d.source.id || n.id === d.source);
+                    const targetNode = allNodes.find(n => n.id === d.target.id || n.id === d.target);
+                    
+                    if ((sourceNode?.type === 'Product' && targetNode?.type === 'Orglevel3') ||
+                        (sourceNode?.type === 'Orglevel3' && targetNode?.type === 'Product')) {
+                        return 30; // Short distance for product-parent links
+                    }
+                    return linkDistance; // Normal distance for other links
+                }))
                 .force("charge", d3.forceManyBody().strength(charge));
 
             // Create links
@@ -966,7 +1076,13 @@
             node.exit().remove();
 
             const nodeEnter = node.enter().append("circle")
-                .attr("class", "node")
+                .attr("class", d => {
+                    let classes = "node";
+                    if (d.type === 'Orglevel3' && hasProducts(d.id)) {
+                        classes += expandedNodes.has(d.id) ? " expanded" : " expandable";
+                    }
+                    return classes;
+                })
                 .attr("r", d => nodeSize + (d.degree || 0))
                 .call(d3.drag()
                     .on("start", dragstarted)
@@ -976,8 +1092,15 @@
                 .on("mouseout", hideTooltip)
                 .on("click", nodeClicked);
 
-            // Apply colors based on scheme
+            // Apply colors based on scheme and update classes
             nodeEnter.merge(node)
+                .attr("class", d => {
+                    let classes = "node";
+                    if (d.type === 'Orglevel3' && hasProducts(d.id)) {
+                        classes += expandedNodes.has(d.id) ? " expanded" : " expandable";
+                    }
+                    return classes;
+                })
                 .attr("fill", d => getNodeColor(d, colorScheme))
                 .attr("r", d => nodeSize + Math.sqrt(d.degree || 0));
 
@@ -992,34 +1115,15 @@
                 .attr("text-anchor", "middle")
                 .attr("dy", "1.2em");
 
-            // Handle text truncation with expand functionality
+            // Handle text truncation for labels
             labelsEnter.merge(labels)
-                .each(function(d) {
-                    const element = d3.select(this);
+                .text(d => {
                     const text = d.label || d.id;
                     const maxLength = 25;
-                    
-                    element.selectAll("*").remove(); // Clear existing content
-                    
-                    if (text.length <= maxLength) {
-                        // Short text - display as is
-                        element.text(text);
-                    } else {
-                        // Long text - create truncated version with expand option
-                        const truncated = text.substring(0, maxLength) + '...';
-                        element.text(truncated).classed("truncated", true);
-                        
-                        // Add "show more" functionality on click
-                        element.on("click", function(event, d) {
-                            event.stopPropagation();
-                            const current = element.text();
-                            if (current.includes('...')) {
-                                element.text(text).classed("truncated", false);
-                            } else {
-                                element.text(truncated).classed("truncated", true);
-                            }
-                        });
+                    if (text.length > maxLength) {
+                        return text.substring(0, maxLength) + '...';
                     }
+                    return text;
                 })
                 .on("mouseover", function(event, d) {
                     d3.select(this).classed("highlighted", true);
@@ -1030,12 +1134,77 @@
                         d3.select(this).classed("highlighted", false);
                     }
                     hideTooltip();
+                })
+                .on("click", function(event, d) {
+                    nodeClicked(event, d);
                 });
 
-            // Update simulation with faster initial animation
+            // Restore positions for existing nodes to prevent jumping
+            nodes.forEach(node => {
+                const storedPos = currentPositions.get(node.id);
+                if (storedPos) {
+                    node.x = storedPos.x;
+                    node.y = storedPos.y;
+                    node.fx = storedPos.x; // Fix position temporarily
+                    node.fy = storedPos.y;
+                }
+            });
+            
+            // Update simulation without initial fly-in animation
             simulation.nodes(nodes);
             simulation.force("link").links(links);
-            simulation.alpha(1).alphaDecay(0.02).restart(); // Faster convergence
+            
+            // Position new product nodes close to their parent Orglevel3 nodes
+            const newNodes = nodes.filter(node => !currentPositions.has(node.id));
+            newNodes.forEach(node => {
+                if (node.type === 'Product') {
+                    // Find parent Orglevel3 node
+                    const parentLink = allLinks.find(link => {
+                        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                        
+                        if (targetId === node.id) {
+                            const sourceNode = allNodes.find(n => n.id === sourceId);
+                            return sourceNode && sourceNode.type === 'Orglevel3';
+                        }
+                        if (sourceId === node.id) {
+                            const targetNode = allNodes.find(n => n.id === targetId);
+                            return targetNode && targetNode.type === 'Orglevel3';
+                        }
+                        return false;
+                    });
+                    
+                    if (parentLink) {
+                        const parentId = typeof parentLink.source === 'object' ? parentLink.source.id : parentLink.source;
+                        const actualParentId = parentId === node.id ? 
+                            (typeof parentLink.target === 'object' ? parentLink.target.id : parentLink.target) : parentId;
+                        
+                        const parentNode = nodes.find(n => n.id === actualParentId);
+                        if (parentNode && parentNode.x !== undefined && parentNode.y !== undefined) {
+                            // Position products in a small circle around the parent
+                            const angle = Math.random() * 2 * Math.PI;
+                            const distance = 40 + Math.random() * 20; // 40-60px from parent
+                            node.x = parentNode.x + Math.cos(angle) * distance;
+                            node.y = parentNode.y + Math.sin(angle) * distance;
+                        }
+                    }
+                }
+            });
+            
+            // Only pre-warm if we have new nodes without positions
+            if (newNodes.length > 0) {
+                simulation.alpha(0.1); // Gentle simulation for new nodes
+                for (let i = 0; i < 50; ++i) simulation.tick();
+                simulation.alpha(0);
+            }
+            
+            // Release fixed positions after a moment
+            setTimeout(() => {
+                nodes.forEach(node => {
+                    node.fx = null;
+                    node.fy = null;
+                });
+            }, 50);
 
             // Update positions on tick
             simulation.on("tick", () => {
@@ -1052,7 +1221,45 @@
                 nodeGroup.selectAll(".node-label")
                     .attr("x", d => d.x)
                     .attr("y", d => d.y + (nodeSize + Math.sqrt(d.degree || 0)) + 8);
+
+                nodeGroup.selectAll(".expand-indicator")
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y + 3);
             });
+            
+            // Immediately position all elements after pre-warming
+            linkGroup.selectAll(".link")
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            nodeGroup.selectAll(".node")
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            nodeGroup.selectAll(".node-label")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y + (nodeSize + Math.sqrt(d.degree || 0)) + 8);
+
+            nodeGroup.selectAll(".expand-indicator")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y + 3);
+
+            // Add/update expand indicators for Orglevel3 nodes with products
+            const indicators = nodeGroup.selectAll(".expand-indicator")
+                .data(nodes.filter(d => d.type === 'Orglevel3' && hasProducts(d.id)), d => d.id);
+
+            indicators.exit().remove();
+
+            const indicatorsEnter = indicators.enter().append("text")
+                .attr("class", "expand-indicator");
+
+            indicatorsEnter.merge(indicators)
+                .text(d => expandedNodes.has(d.id) ? "−" : "+")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y + 3)
+                .attr("dy", "0.35em"); // Center vertically
         }
 
         // Get node color based on scheme
@@ -1153,16 +1360,42 @@
         }
 
         function nodeClicked(event, d) {
-            // Show details in side panel
+            // Handle Orglevel3 expansion/collapse
+            if (d.type === 'Orglevel3' && hasProducts(d.id)) {
+                event.stopPropagation(); // Prevent any other click handlers
+                
+                console.log(`Expanding/collapsing ${d.label || d.id}, has products: ${hasProducts(d.id)}`);
+                
+                if (expandedNodes.has(d.id)) {
+                    // Collapse: remove from expanded set
+                    expandedNodes.delete(d.id);
+                    console.log(`Collapsed ${d.label || d.id}`);
+                } else {
+                    // Expand: add to expanded set
+                    expandedNodes.add(d.id);
+                    console.log(`Expanded ${d.label || d.id}`);
+                }
+                
+                // Update the visualization with new filter
+                filterVisibleNodes();
+                updateVisualization();
+                updateStats();
+                
+                // Also show details in side panel for Orglevel3 nodes
+                showNodeDetails(d);
+                return; // Don't zoom for expansion clicks
+            }
+            
+            // Show details in side panel for all other nodes
             showNodeDetails(d);
             
-            // Optional: Center the view on the clicked node
+            // Optional: Center the view on the clicked node (only for non-expandable nodes)
             const transform = d3.zoomIdentity
                 .translate(width / 2, height / 2)
                 .scale(1.5)
                 .translate(-d.x, -d.y);
             
-            svg.transition().duration(750).call(
+            svg.transition().duration(300).call(
                 window.zoomBehavior.transform,
                 transform
             );
@@ -1201,7 +1434,8 @@
                 'Company': 'Corporate Entity',
                 'Orglevel1': 'Strategic Business Unit',
                 'Orglevel2': 'Operational Division',
-                'Orglevel3': 'Asset Management Unit'
+                'Orglevel3': 'Asset Management Unit',
+                'Product': 'Product'
             };
             
             detailType.text(typeLabels[node.type] || node.type);
@@ -1223,8 +1457,39 @@
                         <span class="detail-property-key">Entity ID</span>
                         <span class="detail-property-value">${node.neo4jId || 'N/A'}</span>
                     </div>
-                </div>
             `;
+
+            // Add expansion state for Orglevel3 nodes with products
+            if (node.type === 'Orglevel3' && hasProducts(node.id)) {
+                const isExpanded = expandedNodes.has(node.id);
+                const productCount = allLinks.filter(link => {
+                    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                    
+                    if (sourceId === node.id) {
+                        const targetNode = allNodes.find(n => n.id === targetId);
+                        return targetNode && targetNode.type === 'Product';
+                    }
+                    if (targetId === node.id) {
+                        const sourceNode = allNodes.find(n => n.id === sourceId);
+                        return sourceNode && sourceNode.type === 'Product';
+                    }
+                    return false;
+                }).length;
+
+                contentHTML += `
+                    <div class="detail-property">
+                        <span class="detail-property-key">Product Portfolio</span>
+                        <span class="detail-property-value">${productCount} products ${isExpanded ? '(shown)' : '(hidden)'}</span>
+                    </div>
+                    <div class="detail-property">
+                        <span class="detail-property-key">Expansion State</span>
+                        <span class="detail-property-value">${isExpanded ? 'Expanded' : 'Collapsed'}</span>
+                    </div>
+                `;
+            }
+            
+            contentHTML += `</div>`;
 
             if (node.properties && Object.keys(node.properties).length > 0) {
                 contentHTML += `
@@ -1237,15 +1502,21 @@
                         return; // Skip complex objects
                     }
                     
-                    let displayValue = String(value);
-                    if (displayValue.length > 50) {
-                        displayValue = displayValue.substring(0, 50) + '...';
-                    }
+                    const fullValue = String(value);
+                    const maxLength = 50;
+                    const isTruncated = fullValue.length > maxLength;
+                    const displayValue = isTruncated ? 
+                        fullValue.substring(0, maxLength) + '...' : fullValue;
+                    
+                    const propertyId = `property-${node.id}-${key}`.replace(/[^a-zA-Z0-9]/g, '-');
 
                     contentHTML += `
                         <div class="detail-property">
                             <span class="detail-property-key">${key}</span>
-                            <span class="detail-property-value">${displayValue}</span>
+                            <div style="text-align: right; max-width: 60%;">
+                                <span class="detail-property-value ${isTruncated ? 'truncated' : ''}" id="${propertyId}">${displayValue}</span>
+                                ${isTruncated ? `<button class="show-more-btn" onclick="togglePropertyText('${propertyId}', '${encodeURIComponent(fullValue)}', '${encodeURIComponent(displayValue)}')">Show more</button>` : ''}
+                            </div>
                         </div>
                     `;
                 });
@@ -1288,28 +1559,83 @@
 
         // Control functions
         function resetSimulation() {
-            simulation.alpha(1).restart();
+            // Reset without fly-in animation
+            simulation.alpha(1);
+            for (let i = 0; i < 300; ++i) simulation.tick();
+            simulation.alpha(0);
+            
+            // Update positions immediately
+            linkGroup.selectAll(".link")
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            nodeGroup.selectAll(".node")
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            nodeGroup.selectAll(".node-label")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y + (+d3.select("#nodeSize").property("value") + Math.sqrt(d.degree || 0)) + 8);
         }
 
         function resetZoom() {
-            svg.transition().duration(750).call(
+            svg.transition().duration(300).call(
                 window.zoomBehavior.transform,
                 d3.zoomIdentity
             );
         }
 
         function zoomIn() {
-            svg.transition().duration(300).call(
+            svg.transition().duration(150).call(
                 window.zoomBehavior.scaleBy,
                 1.5
             );
         }
 
         function zoomOut() {
-            svg.transition().duration(300).call(
+            svg.transition().duration(150).call(
                 window.zoomBehavior.scaleBy,
                 1 / 1.5
             );
+        }
+
+        function toggleAllProducts() {
+            const orglevel3WithProducts = allNodes
+                .filter(node => node.type === 'Orglevel3' && hasProducts(node.id))
+                .map(node => node.id);
+
+            if (expandedNodes.size === 0) {
+                // Expand all
+                orglevel3WithProducts.forEach(id => expandedNodes.add(id));
+            } else {
+                // Collapse all
+                expandedNodes.clear();
+            }
+
+            filterVisibleNodes();
+            updateVisualization();
+            updateStats();
+        }
+
+        function togglePropertyText(elementId, fullValueEncoded, truncatedValueEncoded) {
+            const element = document.getElementById(elementId);
+            const button = element.nextElementSibling;
+            const fullValue = decodeURIComponent(fullValueEncoded);
+            const truncatedValue = decodeURIComponent(truncatedValueEncoded);
+            
+            if (element.textContent.includes('...')) {
+                // Show full text
+                element.textContent = fullValue;
+                element.classList.remove('truncated');
+                button.textContent = 'Show less';
+            } else {
+                // Show truncated text
+                element.textContent = truncatedValue;
+                element.classList.add('truncated');
+                button.textContent = 'Show more';
+            }
         }
 
         function exportSVG() {
@@ -1337,22 +1663,26 @@
                 linkTypes[link.type] = (linkTypes[link.type] || 0) + 1;
             });
 
+            const totalProducts = allNodes.filter(n => n.type === 'Product').length;
+            const visibleProducts = nodeTypes['Product'] || 0;
+            const expandedCount = expandedNodes.size;
+
             const statsHTML = `
                 <div class="stat-card">
                     <div class="stat-number">${nodes.length}</div>
-                    <div class="stat-label">Total Nodes</div>
+                    <div class="stat-label">Visible Nodes</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">${links.length}</div>
-                    <div class="stat-label">Total Relationships</div>
+                    <div class="stat-label">Visible Relationships</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">${Object.keys(nodeTypes).length}</div>
-                    <div class="stat-label">Node Types</div>
+                    <div class="stat-number">${visibleProducts}/${totalProducts}</div>
+                    <div class="stat-label">Products Shown</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">${Object.keys(linkTypes).length}</div>
-                    <div class="stat-label">Relationship Types</div>
+                    <div class="stat-number">${expandedCount}</div>
+                    <div class="stat-label">Units Expanded</div>
                 </div>
             `;
 
